@@ -1,0 +1,117 @@
+---
+- name: Do something that requires a reboot when it results in a change.
+  ...
+  register: task_result
+
+- name: Reboot immediately if there was a change.
+  shell: "sleep 5 && reboot"
+  async: 1
+  poll: 0
+  when: task_result is changed
+
+- name: Wait for the reboot to complete if there was a change.
+  wait_for_connection:
+    connect_timeout: 20
+    sleep: 5
+    delay: 5
+    timeout: 300
+  when: task_result is changed
+
+- name: Wait for ssh port to reconnect 
+        wait_for:
+          port: 22
+          host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+          search_regex: OpenSSH
+          delay: 10
+          timeout: 60
+        connection: local
+
+      - name: Check the Uptime of the servers
+        shell: "uptime"
+        register: Uptime
+
+      - debug: var=Uptime
+
+
+- name: Perform full patching
+  package:
+    name: '*'
+    state: latest
+
+
+
+- name: Remove undesirable packages
+  package:
+    name: "{{ unnecessary_software }}"
+    state: absent
+
+- name: Stop and disable unnecessary services
+  service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  with_items: "{{ unnecessary_services }}"
+  ignore_errors: yes
+Disable unused software and services
+
+
+- name: Set a message of the day
+  copy:
+    dest: /etc/motd
+    src: etc/motd
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Set a login banner
+  copy:
+    dest: "{{ item }}"
+    src: etc/issue
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+    - /etc/issue
+    - /etc/issue.net
+
+
+ Check the contents of a file for a specific item. One way to do this is by using the shell module and using grep
+
+
+---
+- name: grep
+  hosts: all
+  gather_facts: no
+
+  tasks:
+
+  - name: grep for nameserver
+    shell: grep 'nameserver 192.168.0.1' /etc/resolv.conf
+    register: result
+    changed_when: result.rc != 0
+    failed_when: False
+
+
+
+labuser@ubu:~config-verify]$ ansible-playbook grep.yml
+
+PLAY [grep] *******************************************************************************************************************************
+
+TASK [grep for nameserver] ****************************************************************************************************************
+ok: [host1]
+ok: [host2]
+ok: [host3]
+ok: [host4]
+changed: [host5]
+ok: [host6]
+
+PLAY RECAP ********************************************************************************************************************************
+host2                       : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+host5                       : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+host6                       : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+host3                       : ok=1    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+host1                       : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+host4                       : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0 
+
+
+•	

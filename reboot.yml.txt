@@ -1,0 +1,39 @@
+---
+
+-hosts:  app
+Tasks:
+- name: Weekly system reboots
+...
+register: task_result
+
+- name: Reboot immediately if there was a change.
+shell: "sleep 5 && reboot"
+async: 1
+poll: 0
+when: task_result is changed
+
+- name: Wait for the reboot to complete if there was a change.
+wait_for_connection:
+connect_timeout: 20
+sleep: 5
+delay: 5
+timeout: 300
+when: task_result is changed
+
+- name: Wait for ssh port to reconnect
+wait_for:
+port: 22
+host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+search_regex: OpenSSH
+delay: 10
+timeout: 60
+connection: local
+
+- name: Check the Uptime of the servers
+shell: "uptime"
+register: Uptime
+
+- debug: var=Uptime
+
+…
+
